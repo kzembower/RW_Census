@@ -1,0 +1,17 @@
+# .gitignore file in RW_Census
+# Untracted files:
+*.pdf
+*.png
+*.md
+*.tex
+*.aux
+*.log
+*~
+*.html
+*.Rmd
+*.jpg
+*.Rmd
+.RData
+.Rhistory
+*.R
+cache/*
