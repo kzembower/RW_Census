@@ -1,0 +1,378 @@
+\documentclass{article}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{dcolumn}
+\usepackage{url}
+\usepackage{float}
+% I didn't like the appearance of boxes around floats:
+% \floatstyle{boxed}
+% \restylefloat{table}
+% \restylefloat{figure}
+
+% To create the final PDF output document, in R do:
+%     library(knitr)
+%     knit2pdf("RW_Census.Rnw")
+
+\author{E. Kevin Zembower}
+\title{An analysis of US 2020 Census Data for the Radnor-Winston neighborhood}
+\date{29 May 2023}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+In this document, I use statistics from the 2020 Decennial US Census
+for the census blocks that make up the Radnor-Winston neighhood in
+Baltimore, MD to determine interesting information about the people
+who live here.
+\end{abstract}
+
+The Radnor-Winston neighborhood is a residential area in the
+north-central portion of Baltimore City, Maryland. It's roughly
+bordered on the east by York Road, on the north by Notre Dame Lane, on
+the west by the Loyola University in Maryland/Notre Dame in Maryland
+University library, and on the south by East Coldspring Lane. It
+contains roughly ??? homes and ??? people. More information about the
+neighborhood in general can be obtained on the website of the
+Radnor-Winston Improvement Association (RWIA) at
+\url{https://www.radnorwinston.org}.
+
+\section{Boundaries of the Radnor-Winston neighborhood}
+
+US Census data can be extracted at various level of granularity,
+from the nation, to the state, to the county, etc. The smallest unit
+of data is the census block, a contigious parcel of land, deliniated
+by physical boundaries, such as streets or streams. The next largest
+unit for the census is the block group, consisting of a number of
+contigious blocks. Block groups can be combined into a census tract,
+which averages about 4,000 inhabitants. Tracts are most often combined
+into counties, which are combined into states.
+
+The Radnor-Winston neighborhood (RW) is located in the state of
+Maryland, in "Baltimore city" (census spelling) and in census tract
+2711.01. This tract is bounded by Homewood Ave, York Road, E. Cold
+Spring Lane and N. Charles Street. Most of the homes in this tract are
+not in RW. Similarly, there is no established block group which
+contains a majority of RW houses. For the purposes of this report, the
+boundaries of RW are as shown in Figure \ref{RWneigh}. These
+boundaries were taken by estimating the locations of corners in the
+map shown on the RW web-site at \url{https://www.radnorwinsoton.org},
+downloaded on 13 June 2023.
+
+\begin{figure}
+<<rw_map, echo=FALSE, fig.pos="H">>=
+library(tidyverse)
+library(tidycensus)
+library(sf)
+library(tmap)
+library(tigris)
+options(tigris_use_cache = TRUE)
+library(tmaptools)
+library(knitr)
+opts_chunk$set(cache=TRUE)
+
+## Creating a polygon for RW neighborhood, based on CRS 6487 (NAD83
+## (2011) / Maryland ) map in meters:
+base_x <- 433000
+base_y <- 186000
+rw_neigh_pg_m <- data.frame(
+    matrix(
+        c(540, 1140,
+          540, 1070,
+          480, 1060,
+          490, 1000,
+          570, 1000,
+          570, 940,
+          550, 930,
+          550, 890,
+          580, 890,
+          590, 820,
+          640, 820,
+          650, 590,
+          520, 580,
+          470, 580,
+          350, 660,
+          350, 710,
+          180, 725,
+          190, 900,
+          220, 900,
+          220, 1030,
+          240, 1030,
+          240, 1110
+        ),
+        ncol = 2, byrow = TRUE)
+) %>% + matrix(c(rep(base_x, nrow(.)), rep(base_y, nrow(.))),
+               nrow = nrow(.)) %>%
+sf::st_as_sf(coords = c(1,2), dim = "XY") %>%
+summarize(geometry = st_combine(geometry)) %>%
+st_cast("POLYGON") %>%
+st_set_crs(6487)
+
+## Map it:
+rw_base_blocks <- read_osm(bb(rw_neigh_pg_m, ext = 1.3))
+
+## Line below gives map in meters
+(RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
+## Line below gives map in degrees
+## (RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
+     tm_rgb() +
+     tm_shape(rw_neigh_pg_m) +
+     tm_fill(col = "green", alpha = 0.2) +
+     tm_borders(lwd = 2, alpha = 1) +
+     tm_scale_bar() +
+     ## tm_grid() + tm_xlab("Long") + tm_ylab("Lat") +
+     tm_grid() +
+     tm_layout(title = "Radnor-Winston Neighborhood")
+)
+
+## tmap_save(RW_block_map, "rw_map.png")
+@
+\caption[Map of Radnor-Winston]{Reference map of the Radnor Winston neighborhood}
+\label{RWneigh}
+\end{figure}
+
+Hopefully, the analysis and data in this report can be duplicated and
+verified by the data found at \url{https://data.census.gov/table}. The data
+was extracted from the 2020 Decennial Demographic and Housing
+Characteristics survey.
+
+<<rw-kerneway, echo=FALSE>>=
+## Calculate the median Zillow price of the homes on Kerneway and Charter Oak:
+## Prices below from Zillow map display, as of 13 June 2023. In thousands:
+kern <- c(1440,582, 749, 552, 340, 355, 499, 568, 482, 367,
+          466, 387, 3.2, 337, 346)
+med_kern <- format(median(kern) * 1000, scientific = FALSE, big.mark = ",")
+co <- c(151, 147, 154, 159, 177, 172, 145, 144, 214, 144,
+        173, 175, 144, 144)
+med_co <- format(median(co) * 1000, scientific = FALSE, big.mark = ",")
+@
+
+The census blocks in Table \ref{RWblocks} make up the RW
+neighborhood. For the rest of this analysis, the homes in census block
+3012 will not be included or considered. Of the 66 {?} homes in census
+block 3012, only 27 {?} are in the RW neighborhood. See figure
+\ref{3012}. There is no way to tell which census data for block 3012
+pertains to the RW homes, and which to the homes outside of
+RW. Additionally, the homes in block 3012 which border on Kerneway and
+the western portion of E. Coldspring Lane are significantly different
+than their ajacent neighbors on Kerneway. For one example, the homes
+on Kerneway have a median value on Zillow of \$\Sexpr{med_kern}, while
+the median of their ajacent neighbors on Charter Oak is
+\$\Sexpr{med_co}.
+
+
+\begin{table}[h]
+\centering
+\caption{Census blocks in Radnor Winston}
+\begin{tabular}[t]{r|p{5in}l}
+\hline
+\bfseries{Block} & \bfseries{Boundaries}\\
+\hline
+3000 & Notre Dame Lane, York Road, Winston  Ave,  Norwood  Road (Not  RW:  Properties  along York  Road, including McDonald's and Loyola Public service  facility)\\
+3001 & Notre Dame Lane, Norwood Road, Winston Ave, Whiteford Ave\\
+3002 & Notre Dame Lane, Whiteford Ave, Winston Ave, Underwood Road\\
+3005 & Winston Ave, The Alley, Rossiter Ave, Loyola fence\\
+3006 & Winston Ave, York Road, Rossiter Ave, The Alley (Not RW: Properties along York Road, including Medical Center, Popeye's and Loyola business center)\\
+3007 & Rossiter Ave, The Alley, Radnor Road, Loyola fence\\
+3008 & Rossiter Ave, Crowson Ave, Radnor Road, The Alley\\
+3009 & Rossiter Ave, York Road, Radnor Road, Crowson Ave\\
+3010 & Radnor Road, York Road, Charter Oak Ave, Crowson Ave (Not RW: Loyola IT, Homeland Vocational Center)\\
+3011 & Radnor Road, Crowson Ave, Charter Oad Ave, Norwood Road\\
+3012 & Radnor Road, Norwood Road, Charter Oak Ave, York Road, Coldspring Lane, Kernway (Not RW: Properties along Kerneway and E. Coldspring Lane)\\
+\end{tabular}
+\label{RWblocks}
+\end{table}
+
+\begin{figure}
+<<rw_blocks, echo=FALSE, include=FALSE>>=
+## Can't 'include this block; echos "Using FIPS code..."
+
+## Get the geometry for the US census blocks in RW:
+rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
+                   "3008", "3009", "3010", "3011", "3012")
+
+## Get the RW blocks from the census:
+rw_blocks <- blocks(state = "MD",
+                    county = "Baltimore city",
+                    year = "2020") %>%
+    filter(substr(GEOID20, 6, 11) == "271101" &
+           substr(GEOID20, 12, 15) %in% rw_block_list)
+
+## Bounding box for 3012 block, in CRS 6487:
+bb_3012 <- bb(matrix(c(433100, 186500, # SW LL corner
+                    433700, 186800), ncol = 2)) # NE. UR corner
+@
+<<rw_blocks2, echo=FALSE, fig.pos="H">>=
+## Line below gives map in meters
+(RW_3012_map <- tm_shape(rw_base_blocks, projection = 6487, bbox = bb_3012) +
+     ## Line below gives map in degrees
+     ## (RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
+     tm_rgb() +
+     tm_shape(rw_neigh_pg_m) +
+     ## tm_fill(col = "green", alpha = 0.2) +
+     tm_borders(lwd = 4, alpha = 1) +
+     tm_shape(rw_blocks) +
+     tm_fill("MAP_COLORS", alpha = 0.2, palette = "Accent") +
+     tm_borders(lwd = 2) +
+     tm_scale_bar() +
+     ## tm_grid() + tm_xlab("Long") + tm_ylab("Lat") +
+     tm_layout(title = "US Census block 3012 \nand the Radnor-Winston Neighborhood")
+)
+@ 
+\caption[Census block 3012]{Only a portion of Census Block 3012 lies
+  within the boundaries of Radnor Winston (shown with heavy line
+  border).}
+\label{3012}
+\end{figure}
+
+\section{People in RW}
+
+\subsection{Ages and Genders of People}
+
+\section{Households in RW}
+
+\subsection{Home ownership}
+
+<<RW_HH, echo=FALSE, include=FALSE>>=
+library(tidyverse)
+library(tidycensus)
+
+rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
+                   "3008", "3009", "3010", "3011")
+
+tabID <- "H1"
+
+get_rw <- function(table) {
+    get_decennial(
+        geography = "block",
+        state = "MD",
+        county = "Baltimore city",
+        table = table,
+        cache_table = TRUE,
+        year = "2020",
+        sumfile = "sf1") %>%
+        mutate(NAME = NULL) %>%
+        filter(substr(GEOID, 6, 11) == "271101" &
+               substr(GEOID, 12, 15) %in% rw_block_list)
+}
+
+rw_H1 <- get_rw(tabID)
+
+sum_tab <- function(table) {
+    table %>%
+        group_by(variable) %>%
+        summarize(count = sum(value)) %>%
+        mutate(percent = 100 * count/count[variable == "H1_001N"])
+}
+
+rw_H1_sum_pc <- sum_tab(rw_H1)
+
+get_ct <- function(table) {
+    get_decennial(
+        geography = "tract",
+        state = "MD",
+        county = "Baltimore city",
+        table = table,
+        cache_table = TRUE,
+        year = "2020",
+        sumfile = "sf1") %>%
+        filter(GEOID == "24510271101")
+}
+
+t271101_H1 <- get_ct(tabID)
+
+t271101_H1_sum_pc <- sum_tab(t271101_H1)
+
+get_bc <- function(table) {
+    get_decennial(
+        geography = "county",
+        state = "MD",
+        county = "Baltimore city",
+        table = table,
+        cache_table = TRUE,
+        year = "2020",
+        sumfile = "sf1")
+}
+
+bc_H1 <- get_bc(tabID)
+
+bc_H1_sum_pc <- sum_tab(bc_H1)
+
+get_md <- function(table) {
+    get_decennial(
+        geography = "state",
+        state = "MD",
+        table = table,
+        cache_table = TRUE,
+        year = "2020",
+        sumfile = "sf1")
+}
+
+md_H1 <- get_md(tabID)
+
+md_H1_sum_pc <- sum_tab(md_H1)
+
+H1_col_names <- c(
+    md_c = "count.x",
+    md_p = "percent.x",
+    bc_c = "count.y",
+    bc_p = "percent.y",
+    t_c  = "count.x.x",
+    t_p  = "percent.x.x",
+    rw_c = "count.y.y",
+    rw_p = "percent.y.y"
+)
+
+H1_tab <- md_H1_sum_pc %>%
+     left_join(bc_H1_sum_pc, by = "variable") %>%
+     left_join(t271101_H1_sum_pc, by = "variable") %>%
+     left_join(rw_H1_sum_pc, by = "variable") %>%
+     rename(all_of(H1_col_names)) %>%
+     mutate(variable = as.factor(variable))
+
+H1_tab$variable <- factor(H1_tab$variable,
+                          labels = c("Total", "Occupied", "Vacant")
+                          )
+@
+<<<rw_hh2, echo=FALSE, include=TRUE, tab.pos="H">>=
+library(knitr)
+library(kableExtra)
+
+(kable(H1_tab, format = "latex", booktabs = TRUE,
+      col.names = c("Status", rep(c("Count", "%-age"), times = 4)),
+      caption = "Households by Occupancy Status",
+      label = "RW_HH",
+      caption.short = "HH by Occupancy",
+      digits = c(0,0,1,0,1,0,1,0,1)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_header_above(c(" " = 1,
+                       "Maryland" = 2,
+                       "Baltimore City" = 2,
+                       "Tract 2711.01" = 2,
+                       "Radnor-Winston" = 2))
+)
+
+@
+
+Table \ref{tab:RW_HH} shows the number of households in RW, as well as
+a breakdown of occupancy. As can be seen in this table, Radnor-Winston
+has a higher occupancy rate than our surrounding census tract, as well
+as the city of Baltimore. It's comprable to the state of Maryland
+overall.
+
+
+
+
+Household income
+
+\section{Children in RW}
+\label{sec:Children}
+
+Age breakdown
+
+\section{Race in RW}
+\label{sec:Race}
+
+
+\end{document}
