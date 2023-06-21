@@ -127,8 +127,95 @@ rw_base_blocks <- read_osm(bb(rw_neigh_pg_m, ext = 1.3))
 
 ## tmap_save(RW_block_map, "rw_map.png")
 @
-\caption[Map of Radnor-Winston]{Reference map of the Radnor Winston neighborhood}
+\caption[Map of Radnor-Winston]{The Radnor Winston neighborhood}
 \label{RWneigh}
+\end{figure}
+
+Figure \ref{RW_blocks_map} shows the relationship of the
+Radnor-Winston neighborhood to the pertanent US census blocks. As can
+be seen, almost all of the census blocks in this area fit exactly
+within the boundaries of RAdnor-Winston, with the exception of block
+3012.
+
+\begin{figure}
+<<rw-blocks, echo=FALSE, include=FALSE>>=
+## Create the whole RW boundaries and census blocks
+
+## Creating a polygon for RW neighborhood, based on CRS 6487 (NAD83
+## (2011) / Maryland ) map in meters:
+base_x <- 433000
+base_y <- 186000
+rw_neigh_pg_m <- data.frame(
+    matrix(
+        c(540, 1140,
+          540, 1070,
+          480, 1060,
+          490, 1000,
+          570, 1000,
+          570, 940,
+          550, 930,
+          550, 890,
+          580, 890,
+          590, 820,
+          640, 820,
+          650, 590,
+          520, 580,
+          470, 580,
+          350, 660,
+          350, 710,
+          180, 725,
+          190, 900,
+          220, 900,
+          220, 1030,
+          240, 1030,
+          240, 1110
+        ),
+        ncol = 2, byrow = TRUE)
+) %>% + matrix(c(rep(base_x, nrow(.)), rep(base_y, nrow(.))),
+               nrow = nrow(.)) %>%
+sf::st_as_sf(coords = c(1,2), dim = "XY") %>%
+summarize(geometry = st_combine(geometry)) %>%
+st_cast("POLYGON") %>%
+st_set_crs(6487)
+
+## Get the basemap:
+rw_base_blocks <- read_osm(bb(rw_neigh_pg_m, ext = 1.3))
+
+## Get the geometry for the US census blocks in RW:
+rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
+                   "3008", "3009", "3010", "3011", "3012")
+
+## Get the RW blocks from the census:
+rw_blocks <- blocks(state = "MD",
+                    county = "Baltimore city",
+                    year = "2020") %>%
+    filter(substr(GEOID20, 6, 11) == "271101" &
+           substr(GEOID20, 12, 15) %in% rw_block_list)
+
+## Line below gives map in meters
+RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
+     ## Line below gives map in degrees
+     ## (RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
+     tm_rgb() +
+     tm_shape(rw_neigh_pg_m) +
+     ## tm_fill(col = "green", alpha = 0.2) +
+     tm_borders(lwd = 4, alpha = 1) +
+     tm_shape(rw_blocks) +
+     tm_fill("MAP_COLORS", alpha = 0.2, palette = "Accent") +
+     tm_borders(lwd = 2) +
+     tm_text("BLOCKCE20", col="black") +
+     tm_scale_bar() +
+     ## tm_grid() + tm_xlab("Long") + tm_ylab("Lat") +
+     ## tm_grid() +
+     tm_layout(title = "US Census blocks and the Radnor-Winston Neighborhood")
+@
+<<rw-blocks2>>=
+RW_block_map
+@
+\caption[Map of Radnor-Winston census blocks]{The Radnor Winston
+  neighborhood shown with the pertanent census blocks. The boundaries
+  of the Radnor-Winston neighborhood are shown with a heavy line.}
+\label{RW_blocks_map}
 \end{figure}
 
 Hopefully, the analysis and data in this report can be duplicated and
@@ -213,10 +300,12 @@ bb_3012 <- bb(matrix(c(433100, 186500, # SW LL corner
      tm_borders(lwd = 4, alpha = 1) +
      tm_shape(rw_blocks) +
      tm_fill("MAP_COLORS", alpha = 0.2, palette = "Accent") +
+     ## tm_text("BLOCKCE20", col="black") +
      tm_borders(lwd = 2) +
      tm_scale_bar() +
      ## tm_grid() + tm_xlab("Long") + tm_ylab("Lat") +
-     tm_layout(title = "US Census block 3012 \nand the Radnor-Winston Neighborhood")
+     tm_layout(title = "US Census block 3012 \nand the Radnor-Winston Neighborhood",
+               title.size = 1.5)
 )
 @ 
 \caption[Census block 3012]{Only a portion of Census Block 3012 lies
