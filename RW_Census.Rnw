@@ -22,7 +22,7 @@
 
 \begin{abstract}
 In this document, I use statistics from the 2020 Decennial US Census
-for the census blocks that make up the Radnor-Winston neighhood in
+for the census blocks that make up the Radnor-Winston neighborhood in
 Baltimore, MD to determine interesting information about the people
 who live here.
 \end{abstract}
@@ -41,10 +41,10 @@ Radnor-Winston Improvement Association (RWIA) at
 
 US Census data can be extracted at various level of granularity,
 from the nation, to the state, to the county, etc. The smallest unit
-of data is the census block, a contigious parcel of land, deliniated
+of data is the census block, a contiguous parcel of land, delineated
 by physical boundaries, such as streets or streams. The next largest
 unit for the census is the block group, consisting of a number of
-contigious blocks. Block groups can be combined into a census tract,
+contiguous blocks. Block groups can be combined into a census tract,
 which averages about 4,000 inhabitants. Tracts are most often combined
 into counties, which are combined into states.
 
@@ -132,7 +132,7 @@ rw_base_blocks <- read_osm(bb(rw_neigh_pg_m, ext = 1.3))
 \end{figure}
 
 Figure \ref{RW_blocks_map} shows the relationship of the
-Radnor-Winston neighborhood to the pertanent US census blocks. As can
+Radnor-Winston neighborhood to the pertinent US census blocks. As can
 be seen, almost all of the census blocks in this area fit exactly
 within the boundaries of Radnor-Winston, with the exception of block
 3012.
@@ -173,7 +173,7 @@ RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
 RW_block_map
 @
 \caption[Map of Radnor-Winston census blocks]{The Radnor Winston
-  neighborhood shown with the pertanent census blocks. The boundaries
+  neighborhood shown with the pertinent census blocks. The boundaries
   of the Radnor-Winston neighborhood are shown with a heavy line.}
 \label{RW_blocks_map}
 \end{figure}
@@ -202,9 +202,9 @@ block 3012, only 27 {?} are in the RW neighborhood. See figure
 pertains to the RW homes, and which to the homes outside of
 RW. Additionally, the homes in block 3012 which border on Kerneway and
 the western portion of E. Coldspring Lane are significantly different
-than their ajacent neighbors on Kerneway. For one example, the homes
+than their adjacent neighbors on Kerneway. For one example, the homes
 on Kerneway have a median value on Zillow of \$\Sexpr{med_kern}, while
-the median of their ajacent neighbors on Charter Oak is
+the median of their adjacent neighbors on Charter Oak is
 \$\Sexpr{med_co}.
 
 
@@ -224,8 +224,8 @@ the median of their ajacent neighbors on Charter Oak is
 3008 & Rossiter Ave, Crowson Ave, Radnor Road, The Alley\\
 3009 & Rossiter Ave, York Road, Radnor Road, Crowson Ave\\
 3010 & Radnor Road, York Road, Charter Oak Ave, Crowson Ave (Not RW: Loyola IT, Homeland Vocational Center)\\
-3011 & Radnor Road, Crowson Ave, Charter Oad Ave, Norwood Road\\
-3012 & Radnor Road, Norwood Road, Charter Oak Ave, York Road, Coldspring Lane, Kernway (Not RW: Properties along Kerneway and E. Coldspring Lane)\\
+3011 & Radnor Road, Crowson Ave, Charter Oak Ave, Norwood Road\\
+3012 & Radnor Road, Norwood Road, Charter Oak Ave, York Road, Coldspring Lane, Kerneway (Not RW: Properties along Kerneway and E. Coldspring Lane)\\
 \end{tabular}
 \label{RWblocks}
 \end{table}
@@ -398,7 +398,7 @@ Table \ref{tab:RW_HH} shows the number of households in
 Radnor-Winston, as well as a breakdown by occupancy. As can be seen in
 this table, Radnor-Winston has a higher occupancy rate than our
 surrounding census tract, as well as the city of Baltimore. It's
-comprable to the state of Maryland overall.
+comparable to the state of Maryland overall.
 
 
 
