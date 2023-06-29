@@ -264,6 +264,43 @@ RW_3012_map
 \label{3012}
 \end{figure}
 
+You'll note that all of the census blocks in the list of
+Radnor-Winston blocks begin with a '3.' This is an indication of the
+census block group. However, census blocks 3003, 3004, and 3012 are
+missing. We've already dealt with 3012. Figure \ref{bg3_map} shows
+census block group 3, which is bordered on the north by Homewood
+Avenue, on the west by N. Charles Street, on the south by E. Cold
+Spring Lane and on the east by York Road. While this completely
+encompases the Radnor-Winston neighborhood, it also includes the
+commercial properties of Loyola in Maryland University and Notre Dame
+in Maryland University, including some or all of their student
+residences. I don't know if the student population in these residences
+is included in any census figures. In addition, it includes the homes
+along Kerneway and Westway, which are not part of Radnor-Winston.
+
+\begin{figure}
+  <<bg3_map, echo=FALSE, fig.pos="H">>=
+  ## Get a map of all the census blocks in block group 3:
+  bg3 <- block_groups(state = "MD",
+                      county = "Baltimore city",
+                      year = "2020") %>%
+      filter(TRACTCE == "271101")
+  
+  bg3_base <- read_osm(bb(bg3, ext=1.3))
+  
+  (bg3_map <- tm_shape(bg3_base, projection = 6487) +
+       tm_rgb() +
+       tm_shape(bg3) +
+       tm_fill(col = "green", alpha = 0.2) +
+       tm_layout(title = "US Census block group 3")
+  )
+  @
+  
+  \caption[Block group 3]{US Census block group 3}
+  \label{bg3_map}
+\end{figure}
+
+
 \section{People in RW}
 
 \subsection{Ages and Genders of People}
@@ -373,6 +410,7 @@ H1_tab$variable <- factor(H1_tab$variable,
                           labels = c("Total", "Occupied", "Vacant")
                           )
 @
+
 <<<rw_hh2, echo=FALSE, include=TRUE, tab.pos="H!">>=
 library(knitr)
 library(kableExtra)
@@ -391,7 +429,6 @@ library(kableExtra)
                        "Tract 2711.01" = 2,
                        "Radnor-Winston" = 2))
 )
-
 @
 
 Table \ref{tab:RW_HH} shows the number of households in
@@ -412,6 +449,56 @@ Age breakdown
 
 \section{Race in RW}
 \label{sec:Race}
+
+Breakdown of races in RW
+
+Table \ref{tab:rw_race_2} shows the self-identified racial identification
+of the people in the Radnor-Winston neighborhood.
+
+<<race_tab, echo=FALSE, include=FALSE>>=
+rw_race <- get_decennial(
+    geography = "block",
+    state = "MD",
+    county = "Baltimore city",
+    table = "P1",
+    cache_table = TRUE,
+    year = "2020",
+    sumfile = "pl") %>%
+    filter(substr(GEOID, 6, 11) == "271101" &
+           substr(GEOID, 12, 15) %in% rw_block_list)
+
+pl_vars <- load_variables(year = "2020", dataset = "pl", cache = TRUE)
+
+rw_race_sum <- rw_race %>%
+    left_join(pl_vars, by=c("variable" = "name")) %>%
+    group_by(variable) %>%
+    summarize(count = sum(value)) %>%
+    left_join(pl_vars, by=c("variable" = "name")) %>%
+    filter(count > 0) %>%
+    select(c(label, count)) %>%
+    mutate(percent = 100 * count/count[1])
+
+rw_race_sum$label <- rw_race_sum$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "-") #Replace each !!.* with dash
+@
+<<rw_race_2, echo=FALSE, position="h">>=
+(kable(rw_race_sum, format = "latex", booktabs = TRUE,
+      col.names = c("", "Count", "%-age"),
+      caption = "Racial identification of people in RW",
+      ## label = "rw_race_2",
+      digits = c(0,0,1)
+      ) %>%
+    row_spec(1, bold = TRUE)
+)
+@ 
+
+% ## Questions:
+% ## Median age in RW
+% ## Percentage foreign-born in RW
+% ## In DHC, owned with mortgage versus owned free and clear
+
+% Explore: How different is census block group 3 from boundaries of RW?
 
 
 \end{document}
