@@ -3536,5 +3536,249 @@ consolidate <- function(table) {
     newtable
 }
 
-              
-            
+pop_tab_cons <- consolidate(pop_tab)
+
+## Now, have to convert populations into percentages
+USpop_tot <- pop_tab_cons[1, ]$US_pop
+MDpop_tot <- pop_tab_cons[1, ]$MD_pop
+BCpop_tot <- pop_tab_cons[1, ]$BC_pop
+RWpop_tot <- pop_tab_cons[1, ]$RW_pop
+
+pop_tab_pc <- pop_tab_cons %>%
+    mutate(US_pc = US_pop / USpop_tot * 100,
+           MD_pc = MD_pop / MDpop_tot * 100,
+           BC_pc = BC_pop / BCpop_tot * 100,
+           RW_pc = RW_pop / RWpop_tot * 100,
+           US_pop = NULL,
+           MD_pop = NULL,
+           BC_pop = NULL,
+           RW_pop = NULL)
+
+pop_tab_pc$label <- pop_tab_pc$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+
+## Start to build the population pyramid image
+library(ggplot2)
+
+tmpM_US <- pop_tab_pc %>%
+    slice(3:20) %>%
+    mutate(label = as_factor(label)) %>%
+    select(label, US_pc)
+
+tmpF_US <- pop_tab_pc %>%
+    slice(22:39) %>%
+    mutate(label = as_factor(label)) %>%
+    select(label, US_pc)
+
+ggplot() +
+    geom_col(data = tmpM_US, aes(x = label,
+                                 y = US_pc,
+                                 fill = "lightblue")
+             ) +
+    geom_col(data = tmpF_US, aes(x = label,
+                                 y = -US_pc,
+                                 fill = "lightpink")
+             ) +
+    coord_flip() +
+    scale_fill_manual(values = c("blue", "pink"),
+                      labels = c("Male", "Female")
+                      )
+
+## TODO: remove title of ledgend; facet 4 pop pyrimids together
+
+## 14 Aug: Use pivot_longer() to tidy data and plot faceted pop pyrimyds
+
+table <- "P12"
+rw_pop <- get_rw_pop(table)
+bc_pop <- get_bc_pop(table)
+md_pop <- get_md_pop(table)
+us_pop <- get_us_pop(table)
+
+(pop_tab <- us_pop %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_pop, by = "variable") %>%
+     left_join(bc_pop, by = "variable") %>%
+     left_join(rw_pop, by = "variable") %>%
+     select(!c(variable, concept)) %>% 
+     relocate(label)
+)
+
+consolidate <- function(table) {
+    newtable <- table[0, ] #Duplicate table with zero rows
+    i <- 1 #Index to row number
+    while (i <= nrow(table)) {
+        if (i==6) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!15 to 19 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==6
+        if (i==8) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!20 to 24 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop + table[i+2, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop + table[i+2, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop + table[i+2, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop + table[i+2, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 3
+            next
+        } #endif i==8
+        if (i==18) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!60 to 64 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==18
+        if (i==20) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!65 to 69 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==20
+        if (i==30) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!15 to 19 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==30
+        if (i==32) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!20 to 24 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop + table[i+2, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop + table[i+2, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop + table[i+2, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop + table[i+2, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 3
+            next
+        } #endif i==30
+        if (i==42) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!60 to 64 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==42
+        if (i==44) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!65 to 69 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==44
+        newtable <- rbind(newtable, table[i, ])
+        i <- i+1
+    }
+    newtable
+}
+
+pop_tab_cons <- consolidate(pop_tab)
+
+## Now, have to convert populations into percentages
+USpop_tot <- pop_tab_cons[1, ]$US_pop
+MDpop_tot <- pop_tab_cons[1, ]$MD_pop
+BCpop_tot <- pop_tab_cons[1, ]$BC_pop
+RWpop_tot <- pop_tab_cons[1, ]$RW_pop
+
+pop_tab_pc <- pop_tab_cons %>%
+    mutate(US_pc = US_pop / USpop_tot * 100,
+           MD_pc = MD_pop / MDpop_tot * 100,
+           BC_pc = BC_pop / BCpop_tot * 100,
+           RW_pc = RW_pop / RWpop_tot * 100,
+           ) %>%
+    select(!c(US_pop, MD_pop, BC_pop, RW_pop))
+
+pop_tab_pc$label <- pop_tab_pc$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+
+## Add a gender column:
+pop_male <- pop_tab_pc[3:20,]
+pop_male$gender <- "Male"
+pop_female <- pop_tab_pc[22:39, ]
+pop_female$gender <- "Female"
+
+pop_tab_pc_gender <- rbind(pop_male, pop_female)
+
+pop_long <- pop_tab_pc_gender %>%
+    mutate_at(vars(label, gender), as.factor) %>%
+    mutate(label = fct_relevel(label,
+                               "Under 5 years", "5 to 9 years",
+                               "10 to 14 years", 
+                               "15 to 19 years", "20 to 24 years",
+                               "25 to 29 years", "30 to 34 years", 
+                               "35 to 39 years", "40 to 44 years",
+                               "45 to 49 years",
+                               "50 to 54 years", "55 to 59 years",
+                               "60 to 64 years", "65 to 69 years", 
+                               "70 to 74 years", "75 to 79 years",
+                               "80 to 84 years", "85 years and over")) %>%
+    pivot_longer(
+        cols = !c(label, gender),
+        names_to = "geo",
+        names_pattern = "(.*)_pc",
+        names_transform = as.factor,
+        values_to = "count"
+        ) %>%
+    mutate(geo = fct_relevel(geo, "US", "MD", "BC", "RW")) %>%
+    mutate(geo = fct_recode(geo,
+                            "United States" = "US",
+                            "Maryland" = "MD",
+                            "Baltimore City" = "BC",
+                            "Radnor-Winston" = "RW"
+                            ))
+
+ggplot(data = pop_long, aes(x = label,
+                            y = count,
+                            fill = gender)) +
+    geom_col(data=subset(pop_long, gender == "Male")) +
+    geom_col(data=subset(pop_long, gender == "Female"),
+             aes(y=count*(-1))) +
+    coord_flip() +
+    facet_grid(cols = vars(geo))
