@@ -3781,4 +3781,7 @@ ggplot(data = pop_long, aes(x = label,
     geom_col(data=subset(pop_long, gender == "Female"),
              aes(y=count*(-1))) +
     coord_flip() +
-    facet_grid(cols = vars(geo))
+    facet_grid(cols = vars(geo)) +
+    labs(y = "Population (percentage)",
+         x = "Age Range") +
+    scale_y_continuous(labels = abs)
