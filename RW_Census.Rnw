@@ -4,6 +4,7 @@
 \usepackage{dcolumn}
 \usepackage{url}
 \usepackage{float}
+\usepackage{hyperref}           %for email addresses
 % I didn't like the appearance of boxes around floats:
 % \floatstyle{boxed}
 % \restylefloat{table}
@@ -726,7 +727,295 @@ kable(tab, format = "latex", booktabs = TRUE,
 @
 
 Table \ref{tab:SexbyAge2} shows the breakdown of Radnor-Winston
-residents by age groupings. NOTE: Try to draw a graph of this.
+residents by age and gender groupings.
+
+<<PopPyr, echo=FALSE, include=FALSE>>=
+get_rw_pop <- function(table) {
+    get_decennial(
+        geography = "block",
+        state = "MD",
+        county = "Baltimore city",
+        table = table,
+        cache_table = TRUE,
+        year = 2020,
+        sumfile = "dhc") %>%
+        mutate(NAME = NULL) %>%
+        filter(substr(GEOID, 6, 11) == "271101" &
+               substr(GEOID, 12, 15) %in% rw_block_list) %>%
+        group_by(variable) %>%
+        summarize(RW_pop = sum(value))
+}
+
+get_bc_pop <- function(table) {
+    get_decennial(
+        geography = "county",
+        state = "MD",
+        county = "Baltimore city",
+        table = table,
+        cache_table = TRUE,
+        year = 2020,
+        sumfile = "dhc",
+        ) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "BC_pop" = value,
+               value = NULL,
+               )
+}
+
+get_md_pop <- function(table) {
+    get_decennial(
+        geography = "state",
+        state = "MD",
+        table = table,
+        cache_table = TRUE,
+        year = 2020,
+        sumfile = "dhc",
+        ) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "MD_pop" = value,
+               value = NULL,
+               )
+}
+
+get_us_pop <- function(table) {
+    get_decennial(
+        geography = "us",
+        table = table,
+        cache_table = TRUE,
+        year = 2020,
+        sumfile = "dhc",
+        ) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "US_pop" = value,
+               value = NULL,
+               )
+}
+
+rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
+                   "3008", "3009", "3010", "3011")
+
+labels <- load_variables(2020, "dhc")
+
+table <- "P12"
+rw_pop <- get_rw_pop(table)
+bc_pop <- get_bc_pop(table)
+md_pop <- get_md_pop(table)
+us_pop <- get_us_pop(table)
+
+(pop_tab <- us_pop %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_pop, by = "variable") %>%
+     left_join(bc_pop, by = "variable") %>%
+     left_join(rw_pop, by = "variable") %>%
+     select(!c(variable, concept)) %>% 
+     relocate(label)
+)
+
+consolidate <- function(table) {
+    newtable <- table[0, ] #Duplicate table with zero rows
+    i <- 1 #Index to row number
+    while (i <= nrow(table)) {
+        if (i==6) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!15 to 19 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==6
+        if (i==8) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!20 to 24 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop + table[i+2, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop + table[i+2, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop + table[i+2, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop + table[i+2, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 3
+            next
+        } #endif i==8
+        if (i==18) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!60 to 64 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==18
+        if (i==20) {
+            tmp <- tibble(
+                label = " !!Total:!!Male:!!65 to 69 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==20
+        if (i==30) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!15 to 19 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==30
+        if (i==32) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!20 to 24 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop + table[i+2, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop + table[i+2, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop + table[i+2, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop + table[i+2, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 3
+            next
+        } #endif i==30
+        if (i==42) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!60 to 64 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==42
+        if (i==44) {
+            tmp <- tibble(
+                label = " !!Total:!!Female:!!65 to 69 years",
+                US_pop = table[i, ]$US_pop + table[i+1, ]$US_pop,
+                MD_pop = table[i, ]$MD_pop + table[i+1, ]$MD_pop,
+                BC_pop = table[i, ]$BC_pop + table[i+1, ]$BC_pop,
+                RW_pop = table[i, ]$RW_pop + table[i+1, ]$RW_pop
+            )
+            ## print(tmp)
+            newtable <- rbind(newtable, tmp)
+            i <- i + 2
+            next
+        } #endif i==44
+        newtable <- rbind(newtable, table[i, ])
+        i <- i+1
+    }
+    newtable
+}
+
+pop_tab_cons <- consolidate(pop_tab)
+
+## Now, have to convert populations into percentages
+USpop_tot <- pop_tab_cons[1, ]$US_pop
+MDpop_tot <- pop_tab_cons[1, ]$MD_pop
+BCpop_tot <- pop_tab_cons[1, ]$BC_pop
+RWpop_tot <- pop_tab_cons[1, ]$RW_pop
+
+pop_tab_pc <- pop_tab_cons %>%
+    mutate(US_pc = US_pop / USpop_tot * 100,
+           MD_pc = MD_pop / MDpop_tot * 100,
+           BC_pc = BC_pop / BCpop_tot * 100,
+           RW_pc = RW_pop / RWpop_tot * 100,
+           ) %>%
+    select(!c(US_pop, MD_pop, BC_pop, RW_pop))
+
+pop_tab_pc$label <- pop_tab_pc$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+
+## Add a gender column:
+pop_male <- pop_tab_pc[3:20,]
+pop_male$gender <- "Male"
+pop_female <- pop_tab_pc[22:39, ]
+pop_female$gender <- "Female"
+
+pop_tab_pc_gender <- rbind(pop_male, pop_female)
+
+pop_long <- pop_tab_pc_gender %>%
+    mutate_at(vars(label, gender), as.factor) %>%
+    mutate(label = fct_relevel(label,
+                               "Under 5 years", "5 to 9 years",
+                               "10 to 14 years", 
+                               "15 to 19 years", "20 to 24 years",
+                               "25 to 29 years", "30 to 34 years", 
+                               "35 to 39 years", "40 to 44 years",
+                               "45 to 49 years",
+                               "50 to 54 years", "55 to 59 years",
+                               "60 to 64 years", "65 to 69 years", 
+                               "70 to 74 years", "75 to 79 years",
+                               "80 to 84 years", "85 years and over")) %>%
+    pivot_longer(
+        cols = !c(label, gender),
+        names_to = "geo",
+        names_pattern = "(.*)_pc",
+        names_transform = as.factor,
+        values_to = "count"
+        ) %>%
+    mutate(geo = fct_relevel(geo, "US", "MD", "BC", "RW")) %>%
+    mutate(geo = fct_recode(geo,
+                            "United States" = "US",
+                            "Maryland" = "MD",
+                            "Baltimore City" = "BC",
+                            "Radnor-Winston" = "RW"
+                            ))
+@
+
+\begin{figure}
+<<PopPyr2, echo=FALSE, include=TRUE, position="h!", out.height = '0.5\\linewidth'>>=
+ggplot(data = pop_long, aes(x = label,
+                            y = count,
+                            fill = gender)) +
+    geom_col(data=subset(pop_long, gender == "Male")) +
+    geom_col(data=subset(pop_long, gender == "Female"),
+             aes(y=count*(-1))) +
+    coord_flip() +
+    facet_grid(cols = vars(geo)) +
+    labs(y = "Population (percentage)",
+         x = "Age Range") +
+    scale_y_continuous(labels = abs)
+
+@ 
+\caption[Population Pyramid]{A ``Population Pyramid'' comparing the
+  population by age ranges and gender, for the United States,
+  Maryland, Baltimore Ciry and the Radnor-Winston census block groups}
+  \label{PopPyr2}
+\end{figure}
+
+The data in table \ref{tab:SexbyAge2} can be represented graphicly in
+a ``population pyramid.'' Figure \ref{PopPyr2} shows the population
+pyramid for the United States, Maryland, Baltimore City and the
+Radnor-Winston census blocks. Since the population of Radnor-Winston
+is so small overall (about ??? people), the number of individuals in
+each age range is equally small, leading to a large statistical
+variability in the population percentages. For instance, the largest
+age group for females is 70-74 years, which is probably just a
+statistical abnormallity rather than a statistically significant
+finding.
 
 Household income
 
@@ -885,6 +1174,13 @@ The Baltimore Neighborhood Indicators Alliance, at
 neighborhood into the ``North Baltimore/Guilford/Homeland'' area. This
 is less than helpful, as this geographic area contains many homes and
 households with very different characteristics than Radnor-Winston.
+
+\subsection{Discussion}
+You can participate in a discussion of these results on the project's
+web page, at \url{https://github.com/kzembower/RW_Census/wiki}. This
+is a good place to ask questions or propose alternative conclusions to
+the ones I've offered in this paper. Additionally, you can email me
+directly at \href{mailto:kevin@zembower.org}{kevin@zembower.org}.
 
 % ## Questions:
 % ## Median age in RW
