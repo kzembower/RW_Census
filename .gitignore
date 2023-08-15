@@ -1,6 +1,5 @@
 # .gitignore file in RW_Census
 # Untracted files:
-*.pdf
 *.png
 *.md
 *.tex
