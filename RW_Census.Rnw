@@ -141,7 +141,7 @@ within the boundaries of Radnor-Winston, with the exception of block
 <<rw-blocks, echo=FALSE, include=FALSE>>=
 ## Create the whole RW boundaries and census blocks
 
-## Get the geometry for the US census blocks in RW:
+## Get the geometry for the US census blocks in RW,  including 3012:
 rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
                    "3008", "3009", "3010", "3011", "3012")
 
@@ -154,8 +154,6 @@ rw_blocks <- blocks(state = "MD",
 
 ## Line below gives map in meters
 RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
-     ## Line below gives map in degrees
-     ## (RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
      tm_rgb() +
      tm_shape(rw_neigh_pg_m) +
      ## tm_fill(col = "green", alpha = 0.2) +
@@ -232,7 +230,7 @@ the median of their adjacent neighbors on Charter Oak is
 
 \begin{figure}
 <<block3012, echo=FALSE, include=FALSE>>=
-## Can't 'include this block; echos "Using FIPS code..."
+## Can't 'include this block; echoes "Using FIPS code..."
 
 ## Bounding box for 3012 block, in CRS 6487:
 bb_3012 <- bb(matrix(c(433100, 186500, # SW LL corner
@@ -240,8 +238,6 @@ bb_3012 <- bb(matrix(c(433100, 186500, # SW LL corner
 
 ## Line below gives map in meters
 RW_3012_map <- tm_shape(rw_base_blocks, projection = 6487, bbox = bb_3012) +
-     ## Line below gives map in degrees
-     ## (RW_block_map <- tm_shape(rw_base_blocks, projection = 6487) +
      tm_rgb() +
      tm_shape(rw_neigh_pg_m) +
      ## tm_fill(col = "green", alpha = 0.2) +
@@ -313,105 +309,125 @@ along Kerneway and Westway, which are not part of Radnor-Winston.
 library(tidyverse)
 library(tidycensus)
 
+## General functions for all get-table functions
 rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
                    "3008", "3009", "3010", "3011")
 
-tabID <- "H1"
-
-get_rw <- function(table) {
+get_rw <- function(table, summary_var) {
     get_decennial(
         geography = "block",
         state = "MD",
         county = "Baltimore city",
         table = table,
         cache_table = TRUE,
-        year = "2020",
-        sumfile = "sf1") %>%
+        year = 2020,
+        sumfile = "dhc",
+        summary_var = summary_var) %>%
         mutate(NAME = NULL) %>%
         filter(substr(GEOID, 6, 11) == "271101" &
-               substr(GEOID, 12, 15) %in% rw_block_list)
-}
-
-rw_H1 <- get_rw(tabID)
-
-sum_tab <- function(table) {
-    table %>%
+               substr(GEOID, 12, 15) %in% rw_block_list) %>%
         group_by(variable) %>%
-        summarize(count = sum(value)) %>%
-        mutate(percent = 100 * count/count[variable == "H1_001N"])
+        summarize(RW_value = sum(value)) %>%
+        mutate("RW_pc" = RW_value/first(RW_value) * 100) %>%
+        relocate(RW_value, .after = RW_pc)
 }
 
-rw_H1_sum_pc <- sum_tab(rw_H1)
-
-get_ct <- function(table) {
-    get_decennial(
-        geography = "tract",
-        state = "MD",
-        county = "Baltimore city",
-        table = table,
-        cache_table = TRUE,
-        year = "2020",
-        sumfile = "sf1") %>%
-        filter(GEOID == "24510271101")
-}
-
-t271101_H1 <- get_ct(tabID)
-
-t271101_H1_sum_pc <- sum_tab(t271101_H1)
-
-get_bc <- function(table) {
+get_bc <- function(table, summary_var) {
     get_decennial(
         geography = "county",
         state = "MD",
         county = "Baltimore city",
         table = table,
         cache_table = TRUE,
-        year = "2020",
-        sumfile = "sf1")
+        year = 2020,
+        sumfile = "dhc",
+        summary_var = summary_var) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "BC_pc" = value / summary_value * 100,
+               value = NULL,
+               summary_value = NULL)
 }
 
-bc_H1 <- get_bc(tabID)
-
-bc_H1_sum_pc <- sum_tab(bc_H1)
-
-get_md <- function(table) {
+get_md <- function(table, summary_var) {
     get_decennial(
         geography = "state",
         state = "MD",
         table = table,
         cache_table = TRUE,
-        year = "2020",
-        sumfile = "sf1")
+        year = 2020,
+        sumfile = "dhc",
+        summary_var = summary_var) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "MD_pc" = value / summary_value * 100,
+               value = NULL,
+               summary_value = NULL)
 }
 
-md_H1 <- get_md(tabID)
+get_us <- function(table, summary_var) {
+    get_decennial(
+        geography = "us",
+        table = table,
+        cache_table = TRUE,
+        year = 2020,
+        sumfile = "dhc",
+        summary_var = summary_var) %>%
+        mutate(GEOID = NULL,
+               NAME = NULL,
+               "US_pc" = value / summary_value * 100,
+               value = NULL,
+               summary_value = NULL)
+}
 
-md_H1_sum_pc <- sum_tab(md_H1)
-
-H1_col_names <- c(
-    md_c = "count.x",
-    md_p = "percent.x",
-    bc_c = "count.y",
-    bc_p = "percent.y",
-    t_c  = "count.x.x",
-    t_p  = "percent.x.x",
-    rw_c = "count.y.y",
-    rw_p = "percent.y.y"
-)
-
-H1_tab <- md_H1_sum_pc %>%
-     left_join(bc_H1_sum_pc, by = "variable") %>%
-     left_join(t271101_H1_sum_pc, by = "variable") %>%
-     left_join(rw_H1_sum_pc, by = "variable") %>%
-     rename(all_of(H1_col_names)) %>%
-     mutate(variable = as.factor(variable))
-
-H1_tab$variable <- factor(H1_tab$variable,
-                          labels = c("Total", "Occupied", "Vacant")
-                          )
+labels <- load_variables(2020, "dhc", cache = TRUE)
+## End of general get-table functions
 @
 
-<<<rw_hh2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+<<TbyOwnership, echo=FALSE, include=FALSE>>=
+tableID <- "H15"
+summary_var <- "H15_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<TbyOwnership2, echo=FALSE, include=TRUE,tab.pos="H!" >>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by Children",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Presence of People under 18 Years (Decennial Census table H15)",
+      caption.short = "HT by Children",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2,5), level_of_indent = 1) %>%
+    add_indent(c(3, 4, 6, 7), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:TbyOwnership2} shows how the residents in Radnor-Winston own or rent their homes.
+
+<<<HTbyRace, echo=FALSE, include=TRUE, tab.pos="H!">>=
 library(knitr)
 library(kableExtra)
 
@@ -431,67 +447,444 @@ library(kableExtra)
 )
 @
 
-Table \ref{tab:RW_HH} shows the number of households in
-Radnor-Winston, as well as a breakdown by occupancy. As can be seen in
-this table, Radnor-Winston has a higher occupancy rate than our
-surrounding census tract, as well as the city of Baltimore. It's
-comparable to the state of Maryland overall.
+<<h10, echo=FALSE, include=FALSE>>=
+library(tidyverse)
+library(tidycensus)
+
+rw_block_list <- c("3000", "3001", "3002", "3005", "3006", "3007",
+                   "3008", "3009", "3010", "3011")
+
+tableID <- "H10"
+summary_var <- "H10_001N"
+
+rw_H10 <- get_rw(tableID, summary_var)
+
+bc_H10 <- get_bc(tableID, summary_var)
+
+md_H10 <- get_md(tableID, summary_var)
+
+us_H10 <- get_us(tableID, summary_var)
 
 
+h10_tab <- us_H10 %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_H10, by = "variable") %>%
+     left_join(bc_H10, by = "variable") %>%
+     left_join(rw_H10, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
 
+h10_tab$label <- h10_tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+
+@
+
+<<HTbyRace2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+library(knitr)
+library(kableExtra)
+
+kable(h10_tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by Race",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Race, (Decennial Census table H10)",
+      caption.short = "HT by Race",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2,10), level_of_indent = 1) %>%
+    add_indent(c(3:9,11:17), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:HTbyRace2} shows the number of households in
+Radnor-Winston, as well as a breakdown by race of the householder.
+
+<<HTbySize, echo=FALSE, include=FALSE>>=
+tableID <- "H12"
+summary_var <- "H12_001N"
+rw_H12 <- get_rw(tableID, summary_var)
+bc_H12 <- get_bc(tableID, summary_var)
+md_H12 <- get_md(tableID, summary_var)
+us_H12 <- get_us(tableID, summary_var)
+h12_tab <- us_H12 %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_H12, by = "variable") %>%
+     left_join(bc_H12, by = "variable") %>%
+     left_join(rw_H12, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+
+h12_tab$label <- h12_tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@ 
+
+<<HTbySize2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+kable(h12_tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by Race",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Household Size, (Decennial Census table H12)",
+      caption.short = "HT by Size",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2,10), level_of_indent = 1) %>%
+    add_indent(c(3:9,11:17), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:HTbySize2} shows the number of households in
+Radnor-Winston enumerated by the size of the household.
+
+\subsection{Household Types}
+
+<<HHType, echo=FALSE, include=FALSE>>=
+## Table P16 Household Type
+tableID <- "P16"
+summary_var <- "P16_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<HHType2, echo=FALSE, include=TRUE, position = "H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Types",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Types (Decennial Census table P16)",
+      caption.short = "HH Types",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2, 7), level_of_indent = 1) %>%
+    add_indent(c(3, 4, 8, 9), level_of_indent = 2) %>%
+    add_indent(c(5, 6), level_of_indent = 3) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:HHType2} shows the households in Radnor-Winston by
+Household Type, including family and non-family households.
+
+
+\subsection{Householder by Age}
+
+<<HTbyAge, echo=FALSE, include=FALSE>>=
+tableID <- "H13"
+summary_var <- "H13_001N"
+
+(rw_H13 <- get_rw(tableID, summary_var))
+(bc_H13 <- get_bc(tableID, summary_var))
+(md_H13 <- get_md(tableID, summary_var))
+(us_H13 <- get_us(tableID, summary_var))
+
+(h13_tab <- us_H13 %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_H13, by = "variable") %>%
+     left_join(bc_H13, by = "variable") %>%
+     left_join(rw_H13, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+h13_tab$label <- h13_tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+
+@
+
+<<HTbyAge2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+kable(h13_tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by Age",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Age of Householder (Decennial Census table H13)",
+      caption.short = "HT by Age",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2,12), level_of_indent = 1) %>%
+    add_indent(c(3:11,13:21), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:HTbyAge2} shows the age range of the householders in
+the Radnor-Winston neighborhood.
+
+\subsection{Households by Size}
+<<size, echo=FALSE, include=FALSE>>=
+tableID <- "H9"
+summary_var <- "H9_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@ 
+
+<<size2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Size",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Size (Decennial Census table H9)",
+      caption.short = "HH Size",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2:8), level_of_indent = 1) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+<<SexbyAge, echo=FALSE, include=FALSE>>=
+## Table P12 Sex by Age
+tableID <- "P12"
+summary_var <- "P12_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<SexbyAge2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Sex by Age",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Sex by Age for Selected Age Categories (Decennial Census table P12)",
+      caption.short = "HH Sex by Age",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2, 26), level_of_indent = 1) %>%
+    add_indent(c(3:25, 27:49), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+    
+@
+
+Table \ref{tab:SexbyAge2} shows the breakdown of Radnor-Winston
+residents by age groupings. NOTE: Try to draw a graph of this.
 
 Household income
 
 \section{Children in RW}
 \label{sec:Children}
 
+<<HTbyChildren, echo=FALSE, include=FALSE>>=
+tableID <- "H15"
+summary_var <- "H15_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<HTbyChildren2, echo=FALSE, include=TRUE, tab.pos="H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by Children",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Presence of People under 18 Years (Decennial Census table H15)",
+      caption.short = "HT by Children",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2,5), level_of_indent = 1) %>%
+    add_indent(c(3, 4, 6, 7), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@
+
+Table \ref{tab:HTbyChildren2} shows the number of households in the
+Radnor-Winston neighborhood with persons under the age of 18
+present. A simple comparison of percentages is misleading, as RW has
+significantly more Owner-occupied households than Baltimore City,
+although a comprable proportion compared to the state of Maryland and
+the nation as a whole.
+
 Age breakdown
+
+<<SexbyAge20, echo=FALSE, include=FALSE>>=
+## Table P14 Sex by Age under 20
+tableID <- "P14"
+summary_var <- "P14_001N"
+
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
+
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
+)
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<SexbyAge20_2, echo=FALSE, include=TRUE, position="H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Sex by Age (under 20)",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Sex by Age under 20 (Decennial Census table P14)",
+      caption.short = "Sex by Age <20",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2, 23), level_of_indent = 1) %>%
+    add_indent(c(3:22, 24:43), level_of_indent = 2) %>%
+    kable_styling(latex_options = "scale_down")
+@ 
 
 \section{Race in RW}
 \label{sec:Race}
+Table \ref{tab:race2} shows the self-identified racial makeup of the
+people in the Radnor-Winston neighborhood.
 
-Breakdown of races in RW
+<<race, echo=FALSE, include=FALSE>>=
+tableID <- "H6"
+summary_var <- "H6_001N"
 
-Table \ref{tab:rw_race_2} shows the self-identified racial identification
-of the people in the Radnor-Winston neighborhood.
+(rw_tab <- get_rw(tableID, summary_var))
+(bc_tab <- get_bc(tableID, summary_var))
+(md_tab <- get_md(tableID, summary_var))
+(us_tab <- get_us(tableID, summary_var))
 
-<<race_tab, echo=FALSE, include=FALSE>>=
-rw_race <- get_decennial(
-    geography = "block",
-    state = "MD",
-    county = "Baltimore city",
-    table = "P1",
-    cache_table = TRUE,
-    year = "2020",
-    sumfile = "pl") %>%
-    filter(substr(GEOID, 6, 11) == "271101" &
-           substr(GEOID, 12, 15) %in% rw_block_list)
-
-pl_vars <- load_variables(year = "2020", dataset = "pl", cache = TRUE)
-
-rw_race_sum <- rw_race %>%
-    left_join(pl_vars, by=c("variable" = "name")) %>%
-    group_by(variable) %>%
-    summarize(count = sum(value)) %>%
-    left_join(pl_vars, by=c("variable" = "name")) %>%
-    filter(count > 0) %>%
-    select(c(label, count)) %>%
-    mutate(percent = 100 * count/count[1])
-
-rw_race_sum$label <- rw_race_sum$label %>%
-    str_replace("^ !!", "") %>% #Drop the leading ' !!'
-    str_replace_all("[^!]*!!", "-") #Replace each !!.* with dash
-@
-<<rw_race_2, echo=FALSE, position="h">>=
-(kable(rw_race_sum, format = "latex", booktabs = TRUE,
-      col.names = c("", "Count", "%-age"),
-      caption = "Racial identification of people in RW",
-      ## label = "rw_race_2",
-      digits = c(0,0,1)
-      ) %>%
-    row_spec(1, bold = TRUE)
+(tab <- us_tab %>%
+     left_join(labels, by = c("variable" = "name")) %>%
+     left_join(md_tab, by = "variable") %>%
+     left_join(bc_tab, by = "variable") %>%
+     left_join(rw_tab, by = "variable") %>%
+     mutate(variable = NULL, concept = NULL) %>%
+     relocate(label)
 )
+
+tab$label <- tab$label %>%
+    str_replace("^ !!", "") %>% #Drop the leading ' !!'
+    str_replace_all("[^!]*!!", "") #Replace each !!.* with nothing
+@
+
+<<race2, echo=FALSE, include = TRUE, position="H!">>=
+kable(tab, format = "latex", booktabs = TRUE,
+      col.names = c("Household Tenure by RAce",
+                    "United States %-age",
+                    "Maryland %-age",
+                    "Baltimore City %-age",
+                    "RW %-age",
+                    "RW Count"),
+      caption = "Household Tenure by Race (Decennial Census table H6)",
+      caption.short = "HT by Children",
+      digits = c(0,1,1,1,1,0)
+      ) %>%
+    row_spec(1, bold = TRUE) %>%
+    add_indent(c(2:8), level_of_indent = 1) %>%
+    kable_styling(latex_options = "scale_down")
+
 @ 
+
+Table \ref{tab:race2} shows the self-identified race of the
+householders in the Radnor-Winston neighborhood.
+
+\section{Additional Resources}
+Additional statistical information on Radnor-Winston can be obtained
+from the Open Baltimore website of the city of Baltimore, at
+\url{https://data.baltimorecity.gov/datasets/neighborhood-1/explore}. The
+Radnor-Winston neighborhood is OBJECTID 217 in this system.
+
+The Baltimore Neighborhood Indicators Alliance, at
+\url{https://bniajfi.org/vital_signs/}, groups the Radnor-Winston
+neighborhood into the ``North Baltimore/Guilford/Homeland'' area. This
+is less than helpful, as this geographic area contains many homes and
+households with very different characteristics than Radnor-Winston.
 
 % ## Questions:
 % ## Median age in RW
